@@ -2,9 +2,12 @@
 #define COLUMNS 8
 #define RECT_H 25.0f
 #define RECT_W 25.0f
+#define PLAYER_H 5.0f
+#define PLAYER_W 5.0f
 
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -44,7 +47,12 @@
 //     }
 //   }
 
-float px, py;
+SDL_FRect player = {
+    .x = 30.0f,
+    .y = 30.0f,
+    .h = PLAYER_H,
+    .w = PLAYER_W,
+};
 
 int sdl_init(void)
 {
@@ -89,9 +97,10 @@ SDL_Renderer *create_renderer(SDL_Window *window)
   return renderer;
 }
 
-void drawPlayer(SDL_Renderer *renderer)
+void draw_player(SDL_Renderer *renderer)
 {
   SDL_SetRenderDrawColor(renderer, 0, 128, 128, 255);
+  SDL_RenderFillRectF(renderer, &player);
 }
 
 int display(SDL_Window *window, SDL_Renderer *renderer)
@@ -107,11 +116,40 @@ int display(SDL_Window *window, SDL_Renderer *renderer)
       {
         quit = 1;
       }
+      if (e.type == SDL_KEYDOWN)
+      {
+        switch (e.key.keysym.scancode)
+        {
+        case SDL_SCANCODE_DOWN:
+        {
+          player.y += PLAYER_H;
+          break;
+        }
+        case SDL_SCANCODE_RIGHT:
+        {
+          player.x += PLAYER_W;
+          break;
+        }
+        case SDL_SCANCODE_UP:
+        {
+          player.y -= PLAYER_H;
+          break;
+        }
+        case SDL_SCANCODE_LEFT:
+        {
+          player.x -= PLAYER_W;
+          break;
+        }
+        default:
+          break;
+        }
+      }
     }
 
     // Clear screen
     SDL_SetRenderDrawColor(renderer, 225, 225, 225, 255); // White background
     SDL_RenderClear(renderer);
+    draw_player(renderer);
 
     // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     // SDL_RenderFillRectsF(renderer, rects, rectCount);
