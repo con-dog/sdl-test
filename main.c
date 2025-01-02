@@ -14,39 +14,6 @@
 #include <SDL_render.h>
 #include <SDL_rect.h>
 
-// // clang-format off
-//   bool array[ROWS * COLUMNS] = {
-//     1, 1, 1, 1, 1, 1, 1, 1,
-//     1, 0, 0, 0, 0, 0, 0, 1,
-//     1, 0, 0, 0, 0, 0, 0, 1,
-//     1, 0, 0, 0, 0, 0, 0, 1,
-//     1, 0, 0, 0, 0, 0, 0, 1,
-//     1, 0, 0, 0, 0, 0, 0, 1,
-//     1, 0, 0, 0, 0, 0, 0, 1,
-//     1, 1, 1, 1, 1, 1, 1, 1,
-//   };
-// // clang-format on
-
-//   SDL_FRect rects[ROWS * COLUMNS];
-//   int rectCount = 0; // Track actual number of rectangles
-
-//   // Calculate rectangles for walls
-//   float offset = 0.05f; // 10% border size for more visible gaps
-//   for (int i = 0; i < ROWS; i++)
-//   {
-//     for (int j = 0; j < COLUMNS; j++)
-//     {
-//       if (array[i * COLUMNS + j])
-//       { // Note: COLUMNS, not ROWS
-//         rects[rectCount].h = RECT_H * (1.0f - offset);
-//         rects[rectCount].w = RECT_W * (1.0f - offset);
-//         rects[rectCount].x = (j * RECT_W) + (RECT_W * offset / 2); // j for x
-//         rects[rectCount].y = (i * RECT_H) + (RECT_H * offset / 2); // i for y
-//         rectCount++;
-//       }
-//     }
-//   }
-
 SDL_FRect player = {
     .x = 30.0f,
     .y = 30.0f,
@@ -103,6 +70,50 @@ void draw_player(SDL_Renderer *renderer)
   SDL_RenderFillRectF(renderer, &player);
 }
 
+void draw_map(SDL_Renderer *renderer)
+{
+  static bool initialized = false;
+  // clang-format off
+  static bool map2D[ROWS * COLUMNS] = {
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 0, 1, 0, 0, 0, 0, 1,
+    1, 0, 1, 0, 0, 0, 0, 1,
+    1, 0, 1, 0, 1, 1, 0, 1,
+    1, 0, 1, 0, 1, 1, 0, 1,
+    1, 0, 0, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 0, 0, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+  };
+  // clang-format on
+
+  static SDL_FRect rects[ROWS * COLUMNS];
+  static int rectCount = 0; // Track actual number of rectangles
+
+  // Calculate rectangles for walls
+  static float offset = 0.1f; // 10% border size for more visible gaps
+
+  if (!initialized)
+  {
+    for (int i = 0; i < ROWS; i++)
+    {
+      for (int j = 0; j < COLUMNS; j++)
+      {
+        if (map2D[i * COLUMNS + j])
+        { // Note: COLUMNS, not ROWS
+          rects[rectCount].h = RECT_H * (1.0f - offset);
+          rects[rectCount].w = RECT_W * (1.0f - offset);
+          rects[rectCount].x = (j * RECT_W) + (RECT_W * offset / 2); // j for x
+          rects[rectCount].y = (i * RECT_H) + (RECT_H * offset / 2); // i for y
+          rectCount++;
+        }
+      }
+    }
+    initialized = true;
+  }
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  SDL_RenderFillRectsF(renderer, rects, rectCount);
+}
+
 int display(SDL_Window *window, SDL_Renderer *renderer)
 {
   // Main loop
@@ -149,10 +160,10 @@ int display(SDL_Window *window, SDL_Renderer *renderer)
     // Clear screen
     SDL_SetRenderDrawColor(renderer, 225, 225, 225, 255); // White background
     SDL_RenderClear(renderer);
+    //
+    draw_map(renderer);
     draw_player(renderer);
-
-    // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    // SDL_RenderFillRectsF(renderer, rects, rectCount);
+    //
     SDL_RenderPresent(renderer);
   }
   return 0;
