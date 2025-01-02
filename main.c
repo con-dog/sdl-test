@@ -2,24 +2,33 @@
 #define COLUMNS 8
 #define RECT_H 25.0f
 #define RECT_W 25.0f
-#define PLAYER_H 5.0f
-#define PLAYER_W 5.0f
+#define PLAYER_H 10.0f
+#define PLAYER_W 10.0f
+#define PI 3.14159265358979323846264338327
+#define RADIANS *(180 / PI)
+#define DEGREES *(PI / 180)
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 #include <SDL.h>
+#include <SDL_hints.h>
 #include <SDL_ttf.h>
 #include <SDL_render.h>
 #include <SDL_rect.h>
 
-SDL_FRect player = {
-    .x = 30.0f,
-    .y = 30.0f,
-    .h = PLAYER_H,
-    .w = PLAYER_W,
-};
+typedef struct Player
+{
+  float x, y, dx, dy, w, h;
+  double angle; // degrees
+} Player;
+
+Player player;
+SDL_FRect player_rect;
+
+SDL_Texture *playerTexture = NULL;
 
 int sdl_init(void)
 {
@@ -33,6 +42,7 @@ int sdl_init(void)
     SDL_Log("TTF_Init: %s\n", TTF_GetError());
     return 1;
   }
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
   return 0;
 }
 
@@ -54,36 +64,88 @@ SDL_Window *create_window(void)
 SDL_Renderer *create_renderer(SDL_Window *window)
 {
   // Create renderer
-  SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+  SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
   if (!renderer)
   {
     SDL_Log("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
     SDL_DestroyWindow(window);
     return NULL;
   }
+  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
   return renderer;
+}
+
+void player_init(SDL_Renderer *renderer)
+{
+  player.x = 30.0f;
+  player.y = 30.0f;
+  player.angle = 0.0f;
+  player.dx = cos(player.angle) * 5;
+  player.dy = sin(player.angle) * 5;
+  player.h = PLAYER_H,
+  player.w = PLAYER_W;
+  player_rect.h = player.h;
+  player_rect.w = player.w;
+  player_rect.x = player.x;
+  player_rect.y = player.y;
+
+  // Create texture once with higher resolution
+  playerTexture = SDL_CreateTexture(renderer,
+                                    SDL_PIXELFORMAT_RGBA8888,
+                                    SDL_TEXTUREACCESS_TARGET,
+                                    PLAYER_W * 8, // 4x resolution
+                                    PLAYER_H * 8);
+
+  SDL_SetTextureBlendMode(playerTexture, SDL_BLENDMODE_BLEND);
+  SDL_SetTextureScaleMode(playerTexture, SDL_ScaleModeLinear);
+
+  // Initialize texture content
+  SDL_SetRenderTarget(renderer, playerTexture);
+  SDL_SetRenderDrawColor(renderer, 0, 128, 128, 255);
+  SDL_RenderClear(renderer);
+  SDL_SetRenderTarget(renderer, NULL);
 }
 
 void draw_player(SDL_Renderer *renderer)
 {
-  SDL_SetRenderDrawColor(renderer, 0, 128, 128, 255);
-  SDL_RenderFillRectF(renderer, &player);
+  // Calculate the ray start point (center of player)
+  float rayStartX = player.x + (PLAYER_W / 2);
+  float rayStartY = player.y + (PLAYER_H / 2);
+
+  // Calculate ray end point using angle
+  float rayLength = 30.0f; // Length of direction indicator
+  // Calculate ray end point using angle (rotated 90 degrees)
+  float angleRadians = (player.angle) * (PI / 180.0); // Subtract 90 degrees to align with up direction
+  float rayEndX = rayStartX + rayLength * cos(angleRadians);
+  float rayEndY = rayStartY + rayLength * sin(angleRadians);
+
+  // Draw the direction ray
+  SDL_RenderDrawLineF(renderer, rayStartX, rayStartY, rayEndX, rayEndY);
+
+  SDL_FPoint center = {PLAYER_W / 2, PLAYER_H / 2}; // Rotation center point
+  SDL_RenderCopyExF(renderer,
+                    playerTexture,
+                    NULL,           // Source rectangle (NULL for entire texture)
+                    &player_rect,   // Destination rectangle (your player SDL_FRect)
+                    0,              // Angle in degrees
+                    &center,        // Center of rotation
+                    SDL_FLIP_NONE); // No flipping
 }
 
 void draw_map(SDL_Renderer *renderer)
 {
   static bool initialized = false;
   // clang-format off
-  static bool map2D[ROWS * COLUMNS] = {
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 1, 0, 0, 0, 0, 1,
-    1, 0, 1, 0, 0, 0, 0, 1,
-    1, 0, 1, 0, 1, 1, 0, 1,
-    1, 0, 1, 0, 1, 1, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 1,
-    1, 1, 1, 1, 1, 1, 1, 1,
-  };
+	static bool map2D[ROWS * COLUMNS] = {
+		1, 1, 1, 1, 1, 1, 1, 1,
+		1, 0, 1, 0, 0, 0, 0, 1,
+		1, 0, 1, 0, 0, 0, 0, 1,
+		1, 0, 1, 0, 1, 1, 0, 1,
+		1, 0, 1, 0, 1, 1, 0, 1,
+		1, 0, 0, 0, 0, 0, 0, 1,
+		1, 0, 0, 0, 0, 0, 0, 1,
+		1, 1, 1, 1, 1, 1, 1, 1,
+	};
   // clang-format on
 
   static SDL_FRect rects[ROWS * COLUMNS];
@@ -131,24 +193,44 @@ int display(SDL_Window *window, SDL_Renderer *renderer)
       {
         switch (e.key.keysym.scancode)
         {
-        case SDL_SCANCODE_DOWN:
+        case SDL_SCANCODE_LEFT:
         {
-          player.y += PLAYER_H;
+          player.angle -= 15.0f;
+          if (player.angle < 0)
+          {
+            player.angle += 360.0f;
+          }
+          double angle_radians = player.angle * (PI / 180);
+          player.dx = cos(angle_radians) * 5;
+          player.dy = sin(angle_radians) * 5;
           break;
         }
         case SDL_SCANCODE_RIGHT:
         {
-          player.x += PLAYER_W;
+          player.angle += 15.0f;
+          if (player.angle > 360.f)
+          {
+            player.angle -= 360.0f;
+          }
+          double angle_radians = player.angle * (PI / 180);
+          player.dx = cos(angle_radians) * 5;
+          player.dy = sin(angle_radians) * 5;
           break;
         }
         case SDL_SCANCODE_UP:
         {
-          player.y -= PLAYER_H;
+          player.x += player.dx;
+          player.y += player.dy;
+          player_rect.x = player.x;
+          player_rect.y = player.y;
           break;
         }
-        case SDL_SCANCODE_LEFT:
+        case SDL_SCANCODE_DOWN:
         {
-          player.x -= PLAYER_W;
+          player.x -= player.dx;
+          player.y -= player.dy;
+          player_rect.x = player.x;
+          player_rect.y = player.y;
           break;
         }
         default:
@@ -174,6 +256,7 @@ int main(int argc, char *argv[])
   sdl_init();
   SDL_Window *window = create_window();
   SDL_Renderer *renderer = create_renderer(window);
+  player_init(renderer);
   display(window, renderer);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
