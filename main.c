@@ -44,58 +44,32 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  // // Load font
-  // TTF_Font *font = TTF_OpenFont("./fonts/PressStart2P-Regular.ttf", 24);
-  // if (!font)
-  // {
-  //   SDL_Log("Failed to load font! TTF_Error: %s\n", TTF_GetError());
-  //   SDL_DestroyRenderer(renderer);
-  //   SDL_DestroyWindow(window);
-  //   return 1;
-  // }
-
-  // // Prepare text
-  // SDL_Color textColor = {0, 0, 0, 255}; // Black color
-  // SDL_Surface *textSurface = TTF_RenderText_Solid(font, "Hello", textColor);
-  // if (!textSurface)
-  // {
-  //   SDL_Log("Failed to create text surface! TTF_Error: %s\n", TTF_GetError());
-  //   TTF_CloseFont(font);
-  //   SDL_DestroyRenderer(renderer);
-  //   SDL_DestroyWindow(window);
-  //   return 1;
-  // }
-
-  // SDL_Texture *textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
-  // SDL_Rect textRect = {
-  //     400 - (textSurface->w / 2), // Center horizontally
-  //     300 - (textSurface->h / 2), // Center vertically
-  //     textSurface->w,
-  //     textSurface->h};
-  // SDL_FreeSurface(textSurface);
-
   // clang-format off
   bool array[ROWS * COLUMNS] = {
-    1, 1, 1, 1, 1,
-    1, 0, 0, 0, 1,
-    1, 0, 1, 0, 1,
-    1, 0, 0, 0, 1,
-    1, 1, 1, 1, 1,
+      1, 1, 1, 1, 1,
+      1, 0, 0, 0, 1,
+      1, 0, 1, 0, 1,
+      1, 0, 0, 0, 1,
+      1, 1, 1, 1, 1,
   };
   // clang-format on
 
   SDL_FRect rects[ROWS * COLUMNS];
+  int rectCount = 0; // Track actual number of rectangles
 
+  // Calculate rectangles for walls
+  float offset = 0.05f; // 10% border size for more visible gaps
   for (int i = 0; i < ROWS; i++)
   {
     for (int j = 0; j < COLUMNS; j++)
     {
-      if (array[i * ROWS + j] == 1)
-      {
-        rects[i * ROWS + j].h = RECT_H;
-        rects[i * ROWS + j].w = RECT_W;
-        rects[i * ROWS + j].x = i * RECT_W;
-        rects[i * ROWS + j].y = j * RECT_H;
+      if (array[i * COLUMNS + j])
+      { // Note: COLUMNS, not ROWS
+        rects[rectCount].h = RECT_H * (1.0f - offset);
+        rects[rectCount].w = RECT_W * (1.0f - offset);
+        rects[rectCount].x = (j * RECT_W) + (RECT_W * offset / 2); // j for x
+        rects[rectCount].y = (i * RECT_H) + (RECT_H * offset / 2); // i for y
+        rectCount++;
       }
     }
   }
@@ -118,12 +92,8 @@ int main(int argc, char *argv[])
     SDL_RenderClear(renderer);
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderDrawRectsF(renderer, rects, ROWS * COLUMNS);
+    SDL_RenderFillRectsF(renderer, rects, rectCount);
     SDL_RenderPresent(renderer);
-
-    // // Render text
-    // SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
-    // SDL_RenderPresent(renderer);
   }
 
   // Cleanup
