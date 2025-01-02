@@ -1,7 +1,7 @@
 #define ROWS 8
 #define COLUMNS 8
-#define RECT_H 25.0f
-#define RECT_W 25.0f
+#define RECT_H 50.0f
+#define RECT_W 50.0f
 #define PLAYER_H 10.0f
 #define PLAYER_W 10.0f
 #define PI 3.14159265358979323846264338327
@@ -24,11 +24,21 @@ typedef struct Player
   float x, y, dx, dy, w, h;
   double angle; // degrees
 } Player;
-
 Player player;
 SDL_FRect player_rect;
-
 SDL_Texture *playerTexture = NULL;
+// clang-format off
+static bool map2D[ROWS * COLUMNS] = {
+  1, 1, 1, 1, 1, 1, 1, 1,
+  1, 0, 1, 0, 0, 0, 0, 1,
+  1, 0, 1, 0, 0, 0, 0, 1,
+  1, 0, 1, 0, 1, 1, 0, 1,
+  1, 0, 1, 0, 1, 1, 0, 1,
+  1, 0, 0, 0, 0, 0, 0, 1,
+  1, 0, 0, 0, 0, 0, 0, 1,
+  1, 1, 1, 1, 1, 1, 1, 1,
+};
+// clang-format on
 
 int sdl_init(void)
 {
@@ -64,7 +74,7 @@ SDL_Window *create_window(void)
 SDL_Renderer *create_renderer(SDL_Window *window)
 {
   // Create renderer
-  SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+  SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
   if (!renderer)
   {
     SDL_Log("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
@@ -93,7 +103,7 @@ void player_init(SDL_Renderer *renderer)
   playerTexture = SDL_CreateTexture(renderer,
                                     SDL_PIXELFORMAT_RGBA8888,
                                     SDL_TEXTUREACCESS_TARGET,
-                                    PLAYER_W * 8, // 4x resolution
+                                    PLAYER_W * 8, // 8x resolution
                                     PLAYER_H * 8);
 
   SDL_SetTextureBlendMode(playerTexture, SDL_BLENDMODE_BLEND);
@@ -130,24 +140,75 @@ void draw_player(SDL_Renderer *renderer)
                     0,              // Angle in degrees
                     &center,        // Center of rotation
                     SDL_FLIP_NONE); // No flipping
+
+  int r, mx, my, mp, dof;
+  float rx, ry, ra, xo, yo;
+  ra = player.angle * (PI / 180.0); // Convert to radians
+
+  // Check horizontal grid lines
+  dof = 0;
+  float aTan = -1 / tan(ra);
+  float hx = player.x, hy = player.y; // Horizontal intersection points
+  bool foundHorizWall = false;
+
+  if (ra > PI)
+  { // Looking up
+    ry = (((int)player.y / RECT_H) * RECT_H) - 0.0001;
+    rx = (player.y - ry) * aTan + player.x;
+    yo = -RECT_H;
+    xo = -yo * aTan;
+  }
+  else if (ra < PI)
+  { // Looking down
+    ry = (((int)player.y / RECT_H) * RECT_H) + RECT_H;
+    rx = (player.y - ry) * aTan + player.x;
+    yo = RECT_H;
+    xo = -yo * aTan;
+  }
+  else
+  { // Looking straight left or right
+    rx = player.x;
+    ry = player.y;
+    dof = 8;
+  }
+
+  while (dof < 8)
+  {
+    mx = (int)(rx) / RECT_W;
+    my = (int)(ry) / RECT_H;
+    mp = my * COLUMNS + mx;
+
+    // Check if we're in bounds and hit a wall
+    if (mp >= 0 && mp < ROWS * COLUMNS && map2D[mp] == 1)
+    {
+      hx = rx;
+      hy = ry;
+      foundHorizWall = true;
+      dof = 8; // End the loop
+    }
+    else
+    {
+      rx += xo; // Move to next horizontal line
+      ry += yo;
+      dof++;
+    }
+  }
+
+  // Draw the ray if we found a wall
+  if (foundHorizWall)
+  {
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red for horizontal intersections
+    SDL_RenderDrawLineF(renderer,
+                        player.x + PLAYER_W / 2,
+                        player.y + PLAYER_H / 2,
+                        hx,
+                        hy);
+  }
 }
 
-void draw_map(SDL_Renderer *renderer)
+static void draw_map(SDL_Renderer *renderer)
 {
   static bool initialized = false;
-  // clang-format off
-  static bool map2D[ROWS * COLUMNS] = {
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 1, 0, 0, 0, 0, 1,
-    1, 0, 1, 0, 0, 0, 0, 1,
-    1, 0, 1, 0, 1, 1, 0, 1,
-    1, 0, 1, 0, 1, 1, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 1,
-    1, 1, 1, 1, 1, 1, 1, 1,
-  };
-  // clang-format on
-
   static SDL_FRect black_rects[ROWS * COLUMNS];
   static SDL_FRect white_rects[ROWS * COLUMNS];
   static int black_count = 0;
@@ -210,7 +271,7 @@ int display(SDL_Window *window, SDL_Renderer *renderer)
           player.angle -= 15.0f;
           if (player.angle < 0)
           {
-            player.angle += 360.0f;
+            player.angle = 360.0f;
           }
           double angle_radians = player.angle * (PI / 180);
           player.dx = cos(angle_radians) * 5;
@@ -222,7 +283,7 @@ int display(SDL_Window *window, SDL_Renderer *renderer)
           player.angle += 15.0f;
           if (player.angle > 360.f)
           {
-            player.angle -= 360.0f;
+            player.angle = 0.0f;
           }
           double angle_radians = player.angle * (PI / 180);
           player.dx = cos(angle_radians) * 5;
