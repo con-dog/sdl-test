@@ -136,23 +136,23 @@ void draw_map(SDL_Renderer *renderer)
 {
   static bool initialized = false;
   // clang-format off
-	static bool map2D[ROWS * COLUMNS] = {
-		1, 1, 1, 1, 1, 1, 1, 1,
-		1, 0, 1, 0, 0, 0, 0, 1,
-		1, 0, 1, 0, 0, 0, 0, 1,
-		1, 0, 1, 0, 1, 1, 0, 1,
-		1, 0, 1, 0, 1, 1, 0, 1,
-		1, 0, 0, 0, 0, 0, 0, 1,
-		1, 0, 0, 0, 0, 0, 0, 1,
-		1, 1, 1, 1, 1, 1, 1, 1,
-	};
+  static bool map2D[ROWS * COLUMNS] = {
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 0, 1, 0, 0, 0, 0, 1,
+    1, 0, 1, 0, 0, 0, 0, 1,
+    1, 0, 1, 0, 1, 1, 0, 1,
+    1, 0, 1, 0, 1, 1, 0, 1,
+    1, 0, 0, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 0, 0, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+  };
   // clang-format on
 
-  static SDL_FRect rects[ROWS * COLUMNS];
-  static int rectCount = 0; // Track actual number of rectangles
-
-  // Calculate rectangles for walls
-  static float offset = 0.1f; // 10% border size for more visible gaps
+  static SDL_FRect black_rects[ROWS * COLUMNS];
+  static SDL_FRect white_rects[ROWS * COLUMNS];
+  static int black_count = 0;
+  static int white_count = 0;
+  static float offset = 0.1f;
 
   if (!initialized)
   {
@@ -160,20 +160,32 @@ void draw_map(SDL_Renderer *renderer)
     {
       for (int j = 0; j < COLUMNS; j++)
       {
+        SDL_FRect rect;
+        rect.h = RECT_H * (1.0f - offset);
+        rect.w = RECT_W * (1.0f - offset);
+        rect.x = (j * RECT_W) + (RECT_W * offset / 2);
+        rect.y = (i * RECT_H) + (RECT_H * offset / 2);
+
         if (map2D[i * COLUMNS + j])
-        { // Note: COLUMNS, not ROWS
-          rects[rectCount].h = RECT_H * (1.0f - offset);
-          rects[rectCount].w = RECT_W * (1.0f - offset);
-          rects[rectCount].x = (j * RECT_W) + (RECT_W * offset / 2); // j for x
-          rects[rectCount].y = (i * RECT_H) + (RECT_H * offset / 2); // i for y
-          rectCount++;
+        {
+          black_rects[black_count++] = rect;
+        }
+        else
+        {
+          white_rects[white_count++] = rect;
         }
       }
     }
     initialized = true;
   }
+
+  // Draw white rectangles
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  SDL_RenderFillRectsF(renderer, white_rects, white_count);
+
+  // Draw black rectangles
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-  SDL_RenderFillRectsF(renderer, rects, rectCount);
+  SDL_RenderFillRectsF(renderer, black_rects, black_count);
 }
 
 int display(SDL_Window *window, SDL_Renderer *renderer)
