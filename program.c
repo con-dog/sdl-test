@@ -24,17 +24,48 @@ Player_Pos player_pos = {
 };
 //
 const bool *keyboard_state;
+//
+typedef enum Letter
+{
+  z, // 0
+  A,
+  B,
+  C,
+  D,
+  E,
+  F,
+  G,
+  H,
+  I,
+  J,
+  K,
+  L,
+  M,
+  N,
+  O,
+  P,
+  Q,
+  R,
+  S,
+  T,
+  U,
+  V,
+  W,
+  X,
+  Y,
+  Z
+} Letter;
 
 // clang-format off
-const static char map2D[GRID_SIZE] = {
-  1, 1, 1, 1, 1, 1, 1, 1,
-  1, 0, 1, 0, 0, 0, 0, 1,
-  1, 0, 1, 0, 0, 0, 0, 1,
-  1, 0, 1, 0, 1, 1, 0, 1,
-  1, 0, 1, 0, 1, 1, 0, 1,
-  1, 0, 0, 0, 0, 0, 0, 1,
-  1, 0, 0, 0, 0, 0, 0, 1,
-  1, 1, 1, 1, 1, 1, 1, 1,
+const static Letter map2D[GRID_SIZE] = {
+  A, A, A, A, A, A, A, A,
+  A, z, A, z, z, z, z, A,
+  A, z, A, z, z, z, z, A,
+  A, z, A, z, A, A, z, A,
+  A, z, A, z, A, A, z, A,
+  A, z, z, z, z, z, z, A,
+  A, z, z, z, z, z, z, A,
+  A, A, A, A, A, A, A, A,
 };
 // clang-format on
 
@@ -162,7 +193,7 @@ static void draw_dda_ray(void)
     }
 
     // Check if we've hit a wall
-    if (map2D[GRID_ROWS * (int)map_pos_y + (int)map_pos_x] != 0)
+    if (map2D[GRID_ROWS * (int)map_pos_y + (int)map_pos_x] != z)
     {
       hit = 1;
     }
