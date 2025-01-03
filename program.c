@@ -102,41 +102,43 @@ static void draw_player_direction_ray(void)
 // Draw a ray from player to wall using DDA (Digital Differential Analysis) algorithm
 static void draw_dda_ray(void)
 {
-  // Center ray start position on player
-  float ray_start_x = player_pos.x + (PLAYER_SIZE / 2);
-  float ray_start_y = player_pos.y + (PLAYER_SIZE / 2);
-
-  // Calculate ray direction vector from angle
   float angleRadians = (player_pos.angle) * (M_PI / 180.0);
-  float ray_dir_x = cos(angleRadians);
-  float ray_dir_y = sin(angleRadians);
+
+  Ray_Pos ray = {
+      // Center ray start position on player
+      .x0 = player_pos.x + (PLAYER_SIZE / 2),
+      .y0 = player_pos.y + (PLAYER_SIZE / 2),
+      // Calculate ray direction vector from angle
+      .x_dir = cos(angleRadians),
+      .y_dir = sin(angleRadians),
+  };
 
   // Determine step direction (+1 or -1) for x and y based on ray direction
-  float step_x = (ray_dir_x >= 0) ? 1 : -1;
-  float step_y = (ray_dir_y >= 0) ? 1 : -1;
+  float step_x = (ray.x_dir >= 0) ? 1 : -1;
+  float step_y = (ray.y_dir >= 0) ? 1 : -1;
 
   // Calculate delta distances - distance along ray from one x or y side to next
-  float delta_dist_x = fabs(1.0 / ray_dir_x);
-  float delta_dist_y = fabs(1.0 / ray_dir_y);
+  float delta_dist_x = fabs(1.0 / ray.x_dir);
+  float delta_dist_y = fabs(1.0 / ray.y_dir);
 
   // Get player's current map grid cell position
-  float map_pos_x = floorf(ray_start_x / CELL_SIZE);
-  float map_pos_y = floorf(ray_start_y / CELL_SIZE);
+  float map_pos_x = floorf(ray.x0 / CELL_SIZE);
+  float map_pos_y = floorf(ray.y0 / CELL_SIZE);
 
   // Calculate initial side distances - distance from start to first x or y grid line
-  float side_dist_x = (ray_dir_x < 0)
-                          ? ((ray_start_x / CELL_SIZE) - map_pos_x) * delta_dist_x
-                          : (map_pos_x + 1.0f - (ray_start_x / CELL_SIZE)) * delta_dist_x;
+  float side_dist_x = (ray.x_dir < 0)
+                          ? ((ray.x0 / CELL_SIZE) - map_pos_x) * delta_dist_x
+                          : (map_pos_x + 1.0f - (ray.x0 / CELL_SIZE)) * delta_dist_x;
 
-  float side_dist_y = (ray_dir_y < 0)
-                          ? ((ray_start_y / CELL_SIZE) - map_pos_y) * delta_dist_y
-                          : (map_pos_y + 1.0f - (ray_start_y / CELL_SIZE)) * delta_dist_y;
+  float side_dist_y = (ray.y_dir < 0)
+                          ? ((ray.y0 / CELL_SIZE) - map_pos_y) * delta_dist_y
+                          : (map_pos_y + 1.0f - (ray.y0 / CELL_SIZE)) * delta_dist_y;
 
   // Track if we've hit a wall and which side we hit
   int hit = 0;
   int side; // 0 for x-side, 1 for y-side
-  float wall_x = ray_start_x;
-  float wall_y = ray_start_y;
+  float wall_x = ray.x0;
+  float wall_y = ray.y0;
 
   // DDA loop - step through grid cells until we hit a wall
   while (!hit)
@@ -145,8 +147,8 @@ static void draw_dda_ray(void)
     if (side_dist_x < side_dist_y)
     {
       // Calculate exact wall hit position for x-side
-      wall_x = (ray_dir_x < 0) ? (map_pos_x * CELL_SIZE) : ((map_pos_x + 1) * CELL_SIZE);
-      wall_y = ray_start_y + (wall_x - ray_start_x) * ray_dir_y / ray_dir_x;
+      wall_x = (ray.x_dir < 0) ? (map_pos_x * CELL_SIZE) : ((map_pos_x + 1) * CELL_SIZE);
+      wall_y = ray.y0 + (wall_x - ray.x0) * ray.y_dir / ray.x_dir;
       side_dist_x += delta_dist_x;
       map_pos_x += step_x;
       side = 0;
@@ -154,8 +156,8 @@ static void draw_dda_ray(void)
     else
     {
       // Calculate exact wall hit position for y-side
-      wall_y = (ray_dir_y < 0) ? (map_pos_y * CELL_SIZE) : ((map_pos_y + 1) * CELL_SIZE);
-      wall_x = ray_start_x + (wall_y - ray_start_y) * ray_dir_x / ray_dir_y;
+      wall_y = (ray.y_dir < 0) ? (map_pos_y * CELL_SIZE) : ((map_pos_y + 1) * CELL_SIZE);
+      wall_x = ray.x0 + (wall_y - ray.y0) * ray.x_dir / ray.y_dir;
       side_dist_y += delta_dist_y;
       map_pos_y += step_y;
       side = 1;
@@ -170,7 +172,7 @@ static void draw_dda_ray(void)
 
   // Draw the ray from player to wall hit point
   SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-  SDL_RenderLine(renderer, ray_start_x, ray_start_y, wall_x, wall_y);
+  SDL_RenderLine(renderer, ray.x0, ray.y0, wall_x, wall_y);
 }
 
 void draw_player(void)
@@ -222,7 +224,6 @@ static void draw_map(void)
 void rotate_player(float rotation_type, float delta_time)
 {
   player_pos.angle = player_pos.angle + (rotation_type * ROTATION_STEP * PLAYER_ROTATION_SPEED * delta_time);
-  // snap to 15 degree
   player_pos.angle = player_pos.angle < 0.0f ? 360.0f : player_pos.angle;
   double angle_radians = player_pos.angle * (M_PI / 180);
   player_pos.dx = cos(angle_radians) * 5;

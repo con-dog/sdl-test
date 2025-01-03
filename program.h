@@ -32,6 +32,7 @@ typedef struct Player_Pos
 typedef struct Ray_Pos
 {
   float x0, x1, y0, y1;
+  float x_dir, y_dir;
   const float length;
 } Ray_Pos;
 
