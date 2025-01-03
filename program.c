@@ -162,10 +162,6 @@ void apply_player_movement()
   player_rect.y = player_pos.y;
 }
 
-void update_display(void)
-{
-}
-
 uint8_t get_kb_arrow_input_state(void)
 {
   uint8_t state = 0b0;
