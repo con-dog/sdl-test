@@ -57,8 +57,8 @@ static int sdl_init()
 
 static void player_init()
 {
-  player_pos.x = 30.0f;
-  player_pos.y = 30.0f;
+  player_pos.x = 72.0f;
+  player_pos.y = 72.0f;
   player_pos.angle = 0.0f;
   player_pos.dx = cos(player_pos.angle) * 5;
   player_pos.dy = sin(player_pos.angle) * 5;
@@ -94,6 +94,63 @@ static void draw_player_direction_ray(void)
   SDL_RenderLine(renderer, player_ray.x0, player_ray.y0, player_ray.x1, player_ray.y1);
 }
 
+static void draw_dda_ray(void)
+{
+  float ray_start_x = player_pos.x + (PLAYER_SIZE / 2);
+  float ray_start_y = player_pos.y + (PLAYER_SIZE / 2);
+
+  float angleRadians = (player_pos.angle) * (M_PI / 180.0);
+  float ray_dir_x = cos(angleRadians);
+  float ray_dir_y = sin(angleRadians);
+  float step_x = (ray_dir_x >= 0) ? 1 : -1;
+  float step_y = (ray_dir_y >= 0) ? 1 : -1;
+  float delta_dist_x = fabs(1.0 / ray_dir_x);
+  float delta_dist_y = fabs(1.0 / ray_dir_y);
+
+  float map_pos_x = floorf(ray_start_x / CELL_SIZE);
+  float map_pos_y = floorf(ray_start_y / CELL_SIZE);
+
+  float side_dist_x = (ray_dir_x < 0)
+                          ? ((ray_start_x / CELL_SIZE) - map_pos_x) * delta_dist_x
+                          : (map_pos_x + 1.0f - (ray_start_x / CELL_SIZE)) * delta_dist_x;
+
+  float side_dist_y = (ray_dir_y < 0)
+                          ? ((ray_start_y / CELL_SIZE) - map_pos_y) * delta_dist_y
+                          : (map_pos_y + 1.0f - (ray_start_y / CELL_SIZE)) * delta_dist_y;
+
+  int hit = 0;
+  int side;
+  float wall_x = ray_start_x;
+  float wall_y = ray_start_y;
+
+  while (!hit)
+  {
+    if (side_dist_x < side_dist_y)
+    {
+      wall_x = (ray_dir_x < 0) ? (map_pos_x * CELL_SIZE) : ((map_pos_x + 1) * CELL_SIZE);
+      wall_y = ray_start_y + (wall_x - ray_start_x) * ray_dir_y / ray_dir_x;
+      side_dist_x += delta_dist_x;
+      map_pos_x += step_x;
+      side = 0;
+    }
+    else
+    {
+      wall_y = (ray_dir_y < 0) ? (map_pos_y * CELL_SIZE) : ((map_pos_y + 1) * CELL_SIZE);
+      wall_x = ray_start_x + (wall_y - ray_start_y) * ray_dir_x / ray_dir_y;
+      side_dist_y += delta_dist_y;
+      map_pos_y += step_y;
+      side = 1;
+    }
+
+    if (map2D[GRID_ROWS * (int)map_pos_y + (int)map_pos_x] != 0)
+    {
+      hit = 1;
+    }
+  }
+
+  SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+  SDL_RenderLine(renderer, ray_start_x, ray_start_y, wall_x, wall_y);
+}
 void draw_player(void)
 {
   draw_player_direction_ray();
@@ -207,6 +264,7 @@ void update_display(void)
   SDL_RenderClear(renderer);
   draw_map();
   draw_player();
+  draw_dda_ray();
   SDL_RenderPresent(renderer);
 }
 
