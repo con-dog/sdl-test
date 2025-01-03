@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_main.h>
@@ -17,6 +18,8 @@ SDL_Renderer *renderer;
 //
 SDL_FRect player_rect;
 SDL_Texture *player_texture;
+//
+TTF_Font *font;
 //
 Player_Pos player_pos = {
     .w = PLAYER_SIZE,
@@ -46,7 +49,13 @@ static int sdl_init()
     return 3;
   }
 
-  if (!SDL_CreateWindowAndRenderer("2.5D Raycaster", 1024, 512, SDL_WINDOW_RESIZABLE, &win, &renderer))
+  if (!TTF_Init())
+  {
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_ttf could not initialize! TTF_Error: %s\n", SDL_GetError());
+    return 3;
+  }
+
+  if (!SDL_CreateWindowAndRenderer("2.5D Raycaster", WINDOW_W, WINDOW_H, SDL_WINDOW_RESIZABLE, &win, &renderer))
   {
     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window and renderer: %s", SDL_GetError());
     return 3;
@@ -55,7 +64,18 @@ static int sdl_init()
   return 0;
 }
 
-static void player_init()
+static int font_init(void)
+{
+  font = TTF_OpenFont("./fonts/PressStart2P-Regular.ttf", FONT_SMALL);
+  if (!font)
+  {
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to load font! TTF_Error: %s\n", SDL_GetError());
+    return 3;
+  }
+  return 0;
+}
+
+static void player_init(void)
 {
   player_pos.x = 72.0f;
   player_pos.y = 72.0f;
@@ -92,79 +112,114 @@ static void draw_player_direction_ray(void)
   player_ray.y0 = player_pos.y + (PLAYER_SIZE / 2);
 
   // Convert angle to radians and calculate end point using trig
-  float angleRadians = (player_pos.angle) * (M_PI / 180.0);
-  player_ray.x1 = player_ray.x0 + player_ray.length * cos(angleRadians);
-  player_ray.y1 = player_ray.y0 + player_ray.length * sin(angleRadians);
+  float angle_radians = (player_pos.angle) * (M_PI / 180.0);
+  player_ray.x1 = player_ray.x0 + player_ray.length * cos(angle_radians);
+  player_ray.y1 = player_ray.y0 + player_ray.length * sin(angle_radians);
 
   SDL_RenderLine(renderer, player_ray.x0, player_ray.y0, player_ray.x1, player_ray.y1);
+}
+
+static void print_text(float angle_radians, Ray_Pos ray, DDA_Algo dda)
+{
+  char debug_text[256];
+  snprintf(debug_text, sizeof(debug_text),
+           "angle_rads: %.2f\n\n"
+           "ray.x0: %.2f\n"
+           "ray.x_dir: %.2f\n"
+           "step_x: %.2f\n"
+           "map_pos_x: %.2f\n"
+           "side_dist_x: %.2f\n\n"
+           "ray.y0: %.2f\n"
+           "ray.y_dir: %.2f\n"
+           "step_y: %.2f\n"
+           "map_pos_y: %.2f\n"
+           "side_dist_y: %.2f",
+           angle_radians, ray.x0, ray.x_dir, dda.step.x, dda.map_pos.x, dda.side_dist.x, ray.y0, ray.y_dir, dda.step.y, dda.map_pos.y, dda.side_dist.y);
+
+  SDL_Color text_color = {255, 0, 0, 255}; // Red text
+  SDL_Surface *text_surface = TTF_RenderText_Blended_Wrapped(font, debug_text, strlen(debug_text), text_color, WINDOW_W / 4);
+
+  if (text_surface)
+  {
+    SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+    if (text_texture)
+    {
+      SDL_FRect text_rect = {
+          WINDOW_W - text_surface->w - 10, // Position from right with 10px padding
+          10,                              // Position from top with 10px padding
+          text_surface->w,
+          text_surface->h};
+
+      SDL_RenderTexture(renderer, text_texture, NULL, &text_rect);
+      SDL_DestroyTexture(text_texture);
+    }
+    SDL_DestroySurface(text_surface);
+  }
 }
 
 // Draw a ray from player to wall using DDA (Digital Differential Analysis) algorithm
 static void draw_dda_ray(void)
 {
-  float angleRadians = (player_pos.angle) * (M_PI / 180.0);
+  float angle_radians = (player_pos.angle) * (M_PI / 180.0);
 
   Ray_Pos ray = {
       // Center ray start position on player
       .x0 = player_pos.x + (PLAYER_SIZE / 2),
       .y0 = player_pos.y + (PLAYER_SIZE / 2),
       // Calculate ray direction vector from angle
-      .x_dir = cos(angleRadians),
-      .y_dir = sin(angleRadians),
+      .x_dir = cos(angle_radians),
+      .y_dir = sin(angle_radians),
   };
 
-  // Determine step direction (+1 or -1) for x and y based on ray direction
-  float step_x = (ray.x_dir >= 0) ? 1 : -1;
-  float step_y = (ray.y_dir >= 0) ? 1 : -1;
+  DDA_Algo dda = {
+      // Determine step direction (+1 or -1) for x and y based on ray direction
+      .step.x = (ray.x_dir >= 0) ? 1 : -1,
+      .step.y = (ray.y_dir >= 0) ? 1 : -1,
+      // Calculate delta distances - distance along ray from one x or y side to next
+      .delta.x = fabs(1.0 / ray.x_dir),
+      .delta.y = fabs(1.0 / ray.y_dir),
+      // Get player's current map grid cell position
+      .map_pos.x = floorf(ray.x0 / CELL_SIZE),
+      .map_pos.y = floorf(ray.y0 / CELL_SIZE),
+      // Calculate initial side distances - distance from start to first x or y grid line
+      .side_dist.x = (ray.x_dir < 0)
+                         ? ((ray.x0 / CELL_SIZE) - dda.map_pos.x) * dda.delta.x
+                         : (dda.map_pos.x + 1.0f - (ray.x0 / CELL_SIZE)) * dda.delta.x,
+      .side_dist.y = (ray.y_dir < 0)
+                         ? ((ray.y0 / CELL_SIZE) - dda.map_pos.y) * dda.delta.y
+                         : (dda.map_pos.y + 1.0f - (ray.y0 / CELL_SIZE)) * dda.delta.y,
+      .wall.x = ray.x0,
+      .wall.y = ray.y0,
+  };
 
-  // Calculate delta distances - distance along ray from one x or y side to next
-  float delta_dist_x = fabs(1.0 / ray.x_dir);
-  float delta_dist_y = fabs(1.0 / ray.y_dir);
-
-  // Get player's current map grid cell position
-  float map_pos_x = floorf(ray.x0 / CELL_SIZE);
-  float map_pos_y = floorf(ray.y0 / CELL_SIZE);
-
-  // Calculate initial side distances - distance from start to first x or y grid line
-  float side_dist_x = (ray.x_dir < 0)
-                          ? ((ray.x0 / CELL_SIZE) - map_pos_x) * delta_dist_x
-                          : (map_pos_x + 1.0f - (ray.x0 / CELL_SIZE)) * delta_dist_x;
-
-  float side_dist_y = (ray.y_dir < 0)
-                          ? ((ray.y0 / CELL_SIZE) - map_pos_y) * delta_dist_y
-                          : (map_pos_y + 1.0f - (ray.y0 / CELL_SIZE)) * delta_dist_y;
+  print_text(angle_radians, ray, dda);
 
   // Track if we've hit a wall and which side we hit
   int hit = 0;
-  int side; // 0 for x-side, 1 for y-side
-  float wall_x = ray.x0;
-  float wall_y = ray.y0;
 
   // DDA loop - step through grid cells until we hit a wall
   while (!hit)
   {
     // Step in x or y direction depending on which side distance is smaller
-    if (side_dist_x < side_dist_y)
+    if (dda.side_dist.x < dda.side_dist.y)
     {
       // Calculate exact wall hit position for x-side
-      wall_x = (ray.x_dir < 0) ? (map_pos_x * CELL_SIZE) : ((map_pos_x + 1) * CELL_SIZE);
-      wall_y = ray.y0 + (wall_x - ray.x0) * ray.y_dir / ray.x_dir;
-      side_dist_x += delta_dist_x;
-      map_pos_x += step_x;
-      side = 0;
+      dda.wall.x = (ray.x_dir < 0) ? (dda.map_pos.x * CELL_SIZE) : ((dda.map_pos.x + 1) * CELL_SIZE);
+      dda.wall.y = ray.y0 + (dda.wall.x - ray.x0) * ray.y_dir / ray.x_dir;
+      dda.side_dist.x += dda.delta.x;
+      dda.map_pos.x += dda.step.x;
     }
     else
     {
       // Calculate exact wall hit position for y-side
-      wall_y = (ray.y_dir < 0) ? (map_pos_y * CELL_SIZE) : ((map_pos_y + 1) * CELL_SIZE);
-      wall_x = ray.x0 + (wall_y - ray.y0) * ray.x_dir / ray.y_dir;
-      side_dist_y += delta_dist_y;
-      map_pos_y += step_y;
-      side = 1;
+      dda.wall.y = (ray.y_dir < 0) ? (dda.map_pos.y * CELL_SIZE) : ((dda.map_pos.y + 1) * CELL_SIZE);
+      dda.wall.x = ray.x0 + (dda.wall.y - ray.y0) * ray.x_dir / ray.y_dir;
+      dda.side_dist.y += dda.delta.y;
+      dda.map_pos.y += dda.step.y;
     }
 
     // Check if we've hit a wall
-    if (map2D[GRID_ROWS * (int)map_pos_y + (int)map_pos_x] != z)
+    if (map2D[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x] != z)
     {
       hit = 1;
     }
@@ -172,7 +227,7 @@ static void draw_dda_ray(void)
 
   // Draw the ray from player to wall hit point
   SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-  SDL_RenderLine(renderer, ray.x0, ray.y0, wall_x, wall_y);
+  SDL_RenderLine(renderer, ray.x0, ray.y0, dda.wall.x, dda.wall.y);
 }
 
 void draw_player(void)
@@ -319,6 +374,7 @@ void run_game_loop(void)
 int main(int argc, char *argv[])
 {
   sdl_init();
+  font_init();
   player_init();
   keyboard_state = SDL_GetKeyboardState(NULL);
 
@@ -326,6 +382,9 @@ int main(int argc, char *argv[])
 
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(win);
+
+  TTF_CloseFont(font);
+  TTF_Quit();
 
   SDL_Quit();
 

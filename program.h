@@ -1,6 +1,11 @@
 #ifndef PROGRAM_H
 #define PROGRAM_H
 
+// Window
+#define WINDOW_W 1024
+#define WINDOW_H 512
+// Font
+#define FONT_SMALL 12
 // Map
 #define CELL_SIZE 64.0f
 #define GRID_ROWS 8
@@ -35,6 +40,20 @@ typedef struct Ray_Pos
   float x_dir, y_dir;
   const float length;
 } Ray_Pos;
+
+typedef struct Vector_2D
+{
+  float x, y;
+} Vector_2D;
+
+typedef struct DDA_Algo
+{
+  Vector_2D step;
+  Vector_2D delta;
+  Vector_2D map_pos;
+  Vector_2D side_dist;
+  Vector_2D wall;
+} DDA_Algo;
 
 //
 typedef enum Letter
