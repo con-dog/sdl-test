@@ -1,18 +1,3 @@
-#define ROWS 8
-#define COLUMNS 8
-#define RECT_H 50.0f
-#define RECT_W 50.0f
-#define PLAYER_H 10.0f
-#define PLAYER_W 10.0f
-#define PI 3.14159265358979323846264338327
-#define RADIANS *(180 / PI)
-#define DEGREES *(PI / 180)
-#define ANTI_CLOCKWISE -1.0f
-#define CLOCKWISE 1.0f
-#define FORWARD 1.0f
-#define BACKWARD -1.0f
-#define ROTATION_INC 15.0f
-
 #include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -25,21 +10,23 @@
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_rect.h>
 
-SDL_Window *win = NULL;
-SDL_Renderer *renderer = NULL;
+#include "program.h"
 
-typedef struct Player
-{
-  float x, y, dx, dy, w, h;
-  double angle; // degrees
-} Player;
-Player player;
+SDL_Window *win;
+SDL_Renderer *renderer;
+//
 SDL_FRect player_rect;
-SDL_Texture *playerTexture = NULL;
-bool loopShouldStop = false;
+SDL_Texture *player_texture;
+//
+Player_Pos player_pos = {
+    .w = PLAYER_SIZE,
+    .h = PLAYER_SIZE,
+};
+//
+const bool *keyboard_state;
 
 // clang-format off
-static bool map2D[ROWS * COLUMNS] = {
+const static char map2D[GRID_SIZE] = {
   1, 1, 1, 1, 1, 1, 1, 1,
   1, 0, 1, 0, 0, 0, 0, 1,
   1, 0, 1, 0, 0, 0, 0, 1,
@@ -51,96 +38,68 @@ static bool map2D[ROWS * COLUMNS] = {
 };
 // clang-format on
 
-// int sdl_init(void)
-// {
-//   if (SDL_Init(SDL_INIT_VIDEO) < 0)
-//   {
-//     SDL_Log("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
-//     return 1;
-//   }
-//   if (TTF_Init() < 0)
-//   {
-//     SDL_Log("TTF_Init: %s\n", TTF_GetError());
-//     return 1;
-//   }
-//   // SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-//   return 0;
-// }
-
-// SDL_Window *create_window(void)
-// {
-//   SDL_Window *window = SDL_CreateWindow("Hello World",
-//                                         1024, 512);
-//   if (!window)
-//   {
-//     SDL_Log("Window could not be created! SDL_Error: %s\n", SDL_GetError());
-//     return NULL;
-//   }
-//   return window;
-// }
-
-// SDL_Renderer *create_renderer(SDL_Window *window)
-// {
-//   SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL, SDL_RENDERER_PRESENTVSYNC);
-//   if (!renderer)
-//   {
-//     SDL_Log("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
-//     SDL_DestroyWindow(window);
-//     return NULL;
-//   }
-//   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-//   return renderer;
-// }
-
-void player_init(SDL_Renderer *renderer)
+static int sdl_init()
 {
-  player.x = 30.0f;
-  player.y = 30.0f;
-  player.angle = 0.0f;
-  player.dx = cos(player.angle) * 5;
-  player.dy = sin(player.angle) * 5;
-  player.h = PLAYER_H,
-  player.w = PLAYER_W;
-  player_rect.h = player.h;
-  player_rect.w = player.w;
-  player_rect.x = player.x;
-  player_rect.y = player.y;
+  if (!SDL_Init(SDL_INIT_VIDEO))
+  {
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
+    return 3;
+  }
 
-  // Create texture once with higher resolution
-  playerTexture = SDL_CreateTexture(renderer,
-                                    SDL_PIXELFORMAT_RGBA8888,
-                                    SDL_TEXTUREACCESS_TARGET,
-                                    PLAYER_W * 8, // 8x resolution
-                                    PLAYER_H * 8);
+  if (!SDL_CreateWindowAndRenderer("2.5D Raycaster", 1024, 512, SDL_WINDOW_RESIZABLE, &win, &renderer))
+  {
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window and renderer: %s", SDL_GetError());
+    return 3;
+  }
 
-  SDL_SetTextureBlendMode(playerTexture, SDL_BLENDMODE_BLEND);
-  // SDL_SetTextureScaleMode(playerTexture, SDL_ScaleModeLinear);
+  return 0;
+}
 
-  SDL_SetRenderTarget(renderer, playerTexture);
+static void player_init()
+{
+  player_pos.x = 30.0f;
+  player_pos.y = 30.0f;
+  player_pos.angle = 0.0f;
+  player_pos.dx = cos(player_pos.angle) * 5;
+  player_pos.dy = sin(player_pos.angle) * 5;
+  player_rect.h = player_pos.h;
+  player_rect.w = player_pos.w;
+  player_rect.x = player_pos.x;
+  player_rect.y = player_pos.y;
+
+  player_texture = SDL_CreateTexture(renderer,
+                                     SDL_PIXELFORMAT_RGBA8888,
+                                     SDL_TEXTUREACCESS_TARGET,
+                                     PLAYER_SIZE * 4, // 4x resolution
+                                     PLAYER_SIZE * 4);
+
+  SDL_SetTextureBlendMode(player_texture, SDL_BLENDMODE_BLEND);
+  SDL_SetTextureScaleMode(player_texture, SDL_SCALEMODE_LINEAR);
+  SDL_SetRenderTarget(renderer, player_texture);
   SDL_SetRenderDrawColor(renderer, 0, 128, 128, 255);
   SDL_RenderClear(renderer);
   SDL_SetRenderTarget(renderer, NULL);
 }
 
-void draw_player(SDL_Renderer *renderer)
+static void draw_player_direction_ray(void)
 {
-  // Calculate the ray start point (center of player)
-  float rayStartX = player.x + (PLAYER_W / 2);
-  float rayStartY = player.y + (PLAYER_H / 2);
+  static Ray_Pos player_ray = {
+      .length = 30.0f,
+  };
+  player_ray.x0 = player_pos.x + (PLAYER_SIZE / 2);
+  player_ray.y0 = player_pos.y + (PLAYER_SIZE / 2);
+  float angleRadians = (player_pos.angle) * (M_PI / 180.0);
+  player_ray.x1 = player_ray.x0 + player_ray.length * cos(angleRadians);
+  player_ray.y1 = player_ray.y0 + player_ray.length * sin(angleRadians);
+  SDL_RenderLine(renderer, player_ray.x0, player_ray.y0, player_ray.x1, player_ray.y1);
+}
 
-  // Calculate ray end point using angle
-  float rayLength = 30.0f; // Length of direction indicator
-  // Calculate ray end point using angle (rotated 90 degrees)
-  float angleRadians = (player.angle) * (PI / 180.0);
-  float rayEndX = rayStartX + rayLength * cos(angleRadians);
-  float rayEndY = rayStartY + rayLength * sin(angleRadians);
-
-  // Draw the direction ray
-  SDL_RenderLine(renderer, rayStartX, rayStartY, rayEndX, rayEndY);
-
-  SDL_FPoint center = {PLAYER_W / 2, PLAYER_H / 2}; // Rotation center point
+void draw_player(void)
+{
+  draw_player_direction_ray();
+  static SDL_FPoint center = {PLAYER_SIZE / 2, PLAYER_SIZE / 2};
   SDL_RenderTextureRotated(renderer,
-                           playerTexture,
+                           player_texture,
                            NULL,           // Source rectangle (NULL for entire texture)
                            &player_rect,   // Destination rectangle (your player SDL_FRect)
                            0,              // Angle in degrees
@@ -212,28 +171,27 @@ void draw_player(SDL_Renderer *renderer)
   // }
 }
 
-static void draw_map(SDL_Renderer *renderer)
+static void draw_map(void)
 {
   static bool initialized = false;
-  static SDL_FRect black_rects[ROWS * COLUMNS];
-  static SDL_FRect white_rects[ROWS * COLUMNS];
+  static SDL_FRect black_rects[GRID_SIZE];
+  static SDL_FRect white_rects[GRID_SIZE];
   static int black_count = 0;
   static int white_count = 0;
   static float offset = 0.1f;
 
   if (!initialized)
   {
-    for (int i = 0; i < ROWS; i++)
+    for (int i = 0; i < GRID_ROWS; i++)
     {
-      for (int j = 0; j < COLUMNS; j++)
+      for (int j = 0; j < GRID_COLS; j++)
       {
         SDL_FRect rect;
-        rect.h = RECT_H * (1.0f - offset);
-        rect.w = RECT_W * (1.0f - offset);
-        rect.x = (j * RECT_W) + (RECT_W * offset / 2);
-        rect.y = (i * RECT_H) + (RECT_H * offset / 2);
-
-        if (map2D[i * COLUMNS + j])
+        rect.h = CELL_SIZE * (1.0f - offset);
+        rect.w = CELL_SIZE * (1.0f - offset);
+        rect.x = (j * CELL_SIZE) + (CELL_SIZE * offset / 2);
+        rect.y = (i * CELL_SIZE) + (CELL_SIZE * offset / 2);
+        if (map2D[i * GRID_COLS + j])
         {
           black_rects[black_count++] = rect;
         }
@@ -253,31 +211,81 @@ static void draw_map(SDL_Renderer *renderer)
   SDL_RenderFillRects(renderer, black_rects, black_count);
 }
 
-void rotate_player(Player *player, float rotation_type)
+void rotate_player(float rotation_type, float delta_time)
 {
-  player->angle = player->angle + (rotation_type * ROTATION_INC);
-  player->angle = player->angle < 0.0f ? 360.0f : player->angle;
-  double angle_radians = player->angle * (PI / 180);
-  player->dx = cos(angle_radians) * 5;
-  player->dy = sin(angle_radians) * 5;
+  player_pos.angle = player_pos.angle + (rotation_type * ROTATION_STEP * PLAYER_ROTATION_SPEED * delta_time);
+  // snap to 15 degree
+  player_pos.angle = player_pos.angle < 0.0f ? 360.0f : player_pos.angle;
+  double angle_radians = player_pos.angle * (M_PI / 180);
+  player_pos.dx = cos(angle_radians) * 5;
+  player_pos.dy = sin(angle_radians) * 5;
 }
 
-void move_player(Player *player, float direction)
+void move_player(float direction, float delta_time)
 {
-  player->x = player->x + (direction * player->dx);
-  player->y = player->y + (direction * player->dy);
+  player_pos.x = player_pos.x + (direction * player_pos.dx * PLAYER_SPEED * delta_time);
+  player_pos.y = player_pos.y + (direction * player_pos.dy * PLAYER_SPEED * delta_time);
 }
 
-void apply_player_movement(Player *player, SDL_FRect *player_rect)
+void apply_player_movement()
 {
-  player_rect->x = player->x;
-  player_rect->y = player->y;
+  player_rect.x = player_pos.x;
+  player_rect.y = player_pos.y;
 }
 
-int display(SDL_Window *window, SDL_Renderer *renderer, const bool *keyboard_state)
+void update_display(void)
 {
+}
+
+uint8_t get_kb_arrow_input_state(void)
+{
+  uint8_t state = 0b0;
+  if (keyboard_state[SDL_SCANCODE_UP])
+    state |= KEY_UP;
+  if (keyboard_state[SDL_SCANCODE_DOWN])
+    state |= KEY_DOWN;
+  if (keyboard_state[SDL_SCANCODE_LEFT])
+    state |= KEY_LEFT;
+  if (keyboard_state[SDL_SCANCODE_RIGHT])
+    state |= KEY_RIGHT;
+  return state;
+}
+
+void handle_player_movement(float delta_time)
+{
+  uint8_t arrows_state = get_kb_arrow_input_state();
+
+  if (arrows_state & KEY_LEFT)
+  {
+    rotate_player(ANTI_CLOCKWISE, delta_time);
+  }
+  if (arrows_state & KEY_RIGHT)
+  {
+    rotate_player(CLOCKWISE, delta_time);
+  }
+  if (arrows_state & KEY_UP)
+  {
+    move_player(FORWARDS, delta_time);
+  }
+  if (arrows_state & KEY_DOWN)
+  {
+    move_player(BACKWARDS, delta_time);
+  }
+
+  apply_player_movement();
+}
+
+void run_game_loop(void)
+{
+  bool loopShouldStop = false;
+  uint64_t previous_time = SDL_GetTicks();
+
   while (!loopShouldStop)
   {
+    uint64_t current_time = SDL_GetTicks();
+    float delta_time = (current_time - previous_time) / 1000.0f; // Convert to seconds
+    previous_time = current_time;
+
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
@@ -285,20 +293,6 @@ int display(SDL_Window *window, SDL_Renderer *renderer, const bool *keyboard_sta
       {
         loopShouldStop = true;
       }
-
-      if (keyboard_state[SDL_SCANCODE_UP])
-      {
-        if (keyboard_state[SDL_SCANCODE_LEFT])
-        {
-          rotate_player(&player, ANTI_CLOCKWISE);
-        }
-        if (keyboard_state[SDL_SCANCODE_RIGHT])
-        {
-          rotate_player(&player, CLOCKWISE);
-        }
-        move_player(&player, FORWARD);
-      }
-      apply_player_movement(&player, &player_rect);
 
       // if (e.type == SDL_KEYDOWN)
       // {
@@ -349,28 +343,26 @@ int display(SDL_Window *window, SDL_Renderer *renderer, const bool *keyboard_sta
       //   }
       // }
     }
-
+    handle_player_movement(delta_time);
     // Clear screen
     SDL_SetRenderDrawColor(renderer, 225, 225, 225, 255); // White background
     SDL_RenderClear(renderer);
     //
-    draw_map(renderer);
-    draw_player(renderer);
+    draw_map();
+    draw_player();
     //
     SDL_RenderPresent(renderer);
   }
-  return 0;
 }
 
 int main(int argc, char *argv[])
 {
-  // sdl_init();
-  SDL_Init(SDL_INIT_VIDEO);
-  win = SDL_CreateWindow("Hello World", 1024, 512, 0);
-  renderer = SDL_CreateRenderer(win, NULL);
-  player_init(renderer);
-  const bool *keyboard_state = SDL_GetKeyboardState(NULL);
-  display(win, renderer, keyboard_state);
+  sdl_init();
+  player_init();
+  keyboard_state = SDL_GetKeyboardState(NULL);
+
+  run_game_loop();
+
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(win);
 
