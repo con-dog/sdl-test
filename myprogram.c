@@ -7,17 +7,26 @@
 #define PI 3.14159265358979323846264338327
 #define RADIANS *(180 / PI)
 #define DEGREES *(PI / 180)
+#define ANTI_CLOCKWISE -1.0f
+#define CLOCKWISE 1.0f
+#define FORWARD 1.0f
+#define BACKWARD -1.0f
+#define ROTATION_INC 15.0f
 
 #include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <SDL.h>
-#include <SDL_hints.h>
-#include <SDL_ttf.h>
-#include <SDL_render.h>
-#include <SDL_rect.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_main.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_rect.h>
+
+SDL_Window *win = NULL;
+SDL_Renderer *renderer = NULL;
 
 typedef struct Player
 {
@@ -27,6 +36,8 @@ typedef struct Player
 Player player;
 SDL_FRect player_rect;
 SDL_Texture *playerTexture = NULL;
+bool loopShouldStop = false;
+
 // clang-format off
 static bool map2D[ROWS * COLUMNS] = {
   1, 1, 1, 1, 1, 1, 1, 1,
@@ -40,48 +51,46 @@ static bool map2D[ROWS * COLUMNS] = {
 };
 // clang-format on
 
-int sdl_init(void)
-{
-  if (SDL_Init(SDL_INIT_VIDEO) < 0)
-  {
-    SDL_Log("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
-    return 1;
-  }
-  if (TTF_Init() < 0)
-  {
-    SDL_Log("TTF_Init: %s\n", TTF_GetError());
-    return 1;
-  }
-  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
-  return 0;
-}
+// int sdl_init(void)
+// {
+//   if (SDL_Init(SDL_INIT_VIDEO) < 0)
+//   {
+//     SDL_Log("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+//     return 1;
+//   }
+//   if (TTF_Init() < 0)
+//   {
+//     SDL_Log("TTF_Init: %s\n", TTF_GetError());
+//     return 1;
+//   }
+//   // SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+//   return 0;
+// }
 
-SDL_Window *create_window(void)
-{
-  SDL_Window *window = SDL_CreateWindow("Hello World",
-                                        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                        1024, 512,
-                                        SDL_WINDOW_SHOWN);
-  if (!window)
-  {
-    SDL_Log("Window could not be created! SDL_Error: %s\n", SDL_GetError());
-    return NULL;
-  }
-  return window;
-}
+// SDL_Window *create_window(void)
+// {
+//   SDL_Window *window = SDL_CreateWindow("Hello World",
+//                                         1024, 512);
+//   if (!window)
+//   {
+//     SDL_Log("Window could not be created! SDL_Error: %s\n", SDL_GetError());
+//     return NULL;
+//   }
+//   return window;
+// }
 
-SDL_Renderer *create_renderer(SDL_Window *window)
-{
-  SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
-  if (!renderer)
-  {
-    SDL_Log("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
-    SDL_DestroyWindow(window);
-    return NULL;
-  }
-  SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-  return renderer;
-}
+// SDL_Renderer *create_renderer(SDL_Window *window)
+// {
+//   SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL, SDL_RENDERER_PRESENTVSYNC);
+//   if (!renderer)
+//   {
+//     SDL_Log("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
+//     SDL_DestroyWindow(window);
+//     return NULL;
+//   }
+//   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+//   return renderer;
+// }
 
 void player_init(SDL_Renderer *renderer)
 {
@@ -105,7 +114,7 @@ void player_init(SDL_Renderer *renderer)
                                     PLAYER_H * 8);
 
   SDL_SetTextureBlendMode(playerTexture, SDL_BLENDMODE_BLEND);
-  SDL_SetTextureScaleMode(playerTexture, SDL_ScaleModeLinear);
+  // SDL_SetTextureScaleMode(playerTexture, SDL_ScaleModeLinear);
 
   SDL_SetRenderTarget(renderer, playerTexture);
   SDL_SetRenderDrawColor(renderer, 0, 128, 128, 255);
@@ -127,16 +136,16 @@ void draw_player(SDL_Renderer *renderer)
   float rayEndY = rayStartY + rayLength * sin(angleRadians);
 
   // Draw the direction ray
-  SDL_RenderDrawLineF(renderer, rayStartX, rayStartY, rayEndX, rayEndY);
+  SDL_RenderLine(renderer, rayStartX, rayStartY, rayEndX, rayEndY);
 
   SDL_FPoint center = {PLAYER_W / 2, PLAYER_H / 2}; // Rotation center point
-  SDL_RenderCopyExF(renderer,
-                    playerTexture,
-                    NULL,           // Source rectangle (NULL for entire texture)
-                    &player_rect,   // Destination rectangle (your player SDL_FRect)
-                    0,              // Angle in degrees
-                    &center,        // Center of rotation
-                    SDL_FLIP_NONE); // No flipping
+  SDL_RenderTextureRotated(renderer,
+                           playerTexture,
+                           NULL,           // Source rectangle (NULL for entire texture)
+                           &player_rect,   // Destination rectangle (your player SDL_FRect)
+                           0,              // Angle in degrees
+                           &center,        // Center of rotation
+                           SDL_FLIP_NONE); // No flipping
 
   // int r, mx, my, mp, dof;
   // float rx, ry, ra, xo, yo;
@@ -238,72 +247,107 @@ static void draw_map(SDL_Renderer *renderer)
   }
 
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-  SDL_RenderFillRectsF(renderer, white_rects, white_count);
+  SDL_RenderFillRects(renderer, white_rects, white_count);
 
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-  SDL_RenderFillRectsF(renderer, black_rects, black_count);
+  SDL_RenderFillRects(renderer, black_rects, black_count);
 }
 
-int display(SDL_Window *window, SDL_Renderer *renderer)
+void rotate_player(Player *player, float rotation_type)
 {
-  SDL_Event e;
-  int quit = 0;
-  while (!quit)
+  player->angle = player->angle + (rotation_type * ROTATION_INC);
+  player->angle = player->angle < 0.0f ? 360.0f : player->angle;
+  double angle_radians = player->angle * (PI / 180);
+  player->dx = cos(angle_radians) * 5;
+  player->dy = sin(angle_radians) * 5;
+}
+
+void move_player(Player *player, float direction)
+{
+  player->x = player->x + (direction * player->dx);
+  player->y = player->y + (direction * player->dy);
+}
+
+void apply_player_movement(Player *player, SDL_FRect *player_rect)
+{
+  player_rect->x = player->x;
+  player_rect->y = player->y;
+}
+
+int display(SDL_Window *window, SDL_Renderer *renderer, const bool *keyboard_state)
+{
+  while (!loopShouldStop)
   {
-    while (SDL_PollEvent(&e) != 0)
+    SDL_Event event;
+    while (SDL_PollEvent(&event))
     {
-      if (e.type == SDL_QUIT)
+      if (event.type == SDL_EVENT_QUIT)
       {
-        quit = 1;
+        loopShouldStop = true;
       }
-      if (e.type == SDL_KEYDOWN)
+
+      if (keyboard_state[SDL_SCANCODE_UP])
       {
-        switch (e.key.keysym.scancode)
+        if (keyboard_state[SDL_SCANCODE_LEFT])
         {
-        case SDL_SCANCODE_LEFT:
+          rotate_player(&player, ANTI_CLOCKWISE);
+        }
+        if (keyboard_state[SDL_SCANCODE_RIGHT])
         {
-          player.angle -= 15.0f;
-          if (player.angle < 0)
-          {
-            player.angle = 360.0f;
-          }
-          double angle_radians = player.angle * (PI / 180);
-          player.dx = cos(angle_radians) * 5;
-          player.dy = sin(angle_radians) * 5;
-          break;
+          rotate_player(&player, CLOCKWISE);
         }
-        case SDL_SCANCODE_RIGHT:
-        {
-          player.angle += 15.0f;
-          if (player.angle > 360.f)
-          {
-            player.angle = 0.0f;
-          }
-          double angle_radians = player.angle * (PI / 180);
-          player.dx = cos(angle_radians) * 5;
-          player.dy = sin(angle_radians) * 5;
-          break;
-        }
-        case SDL_SCANCODE_UP:
-        {
-          player.x += player.dx;
-          player.y += player.dy;
-          player_rect.x = player.x;
-          player_rect.y = player.y;
-          break;
-        }
-        case SDL_SCANCODE_DOWN:
-        {
-          player.x -= player.dx;
-          player.y -= player.dy;
-          player_rect.x = player.x;
-          player_rect.y = player.y;
-          break;
-        }
-        default:
-          break;
-        }
+        move_player(&player, FORWARD);
       }
+      apply_player_movement(&player, &player_rect);
+
+      // if (e.type == SDL_KEYDOWN)
+      // {
+      //   switch (e.key.keysym.scancode)
+      //   {
+      //   case SDL_SCANCODE_LEFT:
+      //   {
+      //     player.angle -= 15.0f;
+      //     if (player.angle < 0)
+      //     {
+      //       player.angle = 360.0f;
+      //     }
+      //     double angle_radians = player.angle * (PI / 180);
+      //     player.dx = cos(angle_radians) * 5;
+      //     player.dy = sin(angle_radians) * 5;
+      //     break;
+      //   }
+      //   case SDL_SCANCODE_RIGHT:
+      //   {
+      //     player.angle += 15.0f;
+      //     if (player.angle > 360.f)
+      //     {
+      //       player.angle = 0.0f;
+      //     }
+      //     double angle_radians = player.angle * (PI / 180);
+      //     player.dx = cos(angle_radians) * 5;
+      //     player.dy = sin(angle_radians) * 5;
+      //     break;
+      //   }
+      //   case SDL_SCANCODE_UP:
+      //   {
+      //     player.x += player.dx;
+      //     player.y += player.dy;
+      //     player_rect.x = player.x;
+      //     player_rect.y = player.y;
+      //     break;
+      //   }
+      //   case SDL_SCANCODE_DOWN:
+      //   {
+      //     player.x -= player.dx;
+      //     player.y -= player.dy;
+      //     player_rect.x = player.x;
+      //     player_rect.y = player.y;
+      //     break;
+      //   }
+      //   default:
+      //     break;
+      //   }
+      // }
     }
 
     // Clear screen
@@ -320,13 +364,16 @@ int display(SDL_Window *window, SDL_Renderer *renderer)
 
 int main(int argc, char *argv[])
 {
-  sdl_init();
-  SDL_Window *window = create_window();
-  SDL_Renderer *renderer = create_renderer(window);
+  // sdl_init();
+  SDL_Init(SDL_INIT_VIDEO);
+  win = SDL_CreateWindow("Hello World", 1024, 512, 0);
+  renderer = SDL_CreateRenderer(win, NULL);
   player_init(renderer);
-  display(window, renderer);
+  const bool *keyboard_state = SDL_GetKeyboardState(NULL);
+  display(win, renderer, keyboard_state);
   SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
+  SDL_DestroyWindow(win);
+
   SDL_Quit();
 
   return 0;
