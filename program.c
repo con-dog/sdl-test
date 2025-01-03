@@ -263,14 +263,6 @@ static void draw_dda_ray(void)
     // Calculate where to start drawing the vertical line so it's centered
     float line_offset = (WINDOW_H - line_h) / 2;
 
-    // // Draw the vertical wall line
-    // SDL_RenderLine(renderer,
-    //                ray_screen_pos,      // x1
-    //                line_offset,         // y1 (top of line)
-    //                ray_screen_pos,      // x2 (same x position)
-    //                line_offset + line_h // y2 (bottom of line)
-    // );
-
     // Calculate the width of each vertical strip
     float strip_width = (WINDOW_W / 2) / ((end_angle - start_angle) / 0.25f);
 
