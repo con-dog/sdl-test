@@ -160,74 +160,80 @@ static void print_text(float angle_radians, Ray_Pos ray, DDA_Algo dda)
 // Draw a ray from player to wall using DDA (Digital Differential Analysis) algorithm
 static void draw_dda_ray(void)
 {
-  float angle_radians = (player_pos.angle) * (M_PI / 180.0);
+  // Calculate start and end angles for 60° FOV centered on player angle
+  float start_angle = player_pos.angle - 30; // 30° left of center
+  float end_angle = player_pos.angle + 30;   // 30° right of center
 
-  Ray_Pos ray = {
-      // Center ray start position on player
-      .x0 = player_pos.x + (PLAYER_SIZE / 2),
-      .y0 = player_pos.y + (PLAYER_SIZE / 2),
-      // Calculate ray direction vector from angle
-      .x_dir = cos(angle_radians),
-      .y_dir = sin(angle_radians),
-  };
-
-  DDA_Algo dda = {
-      // Determine step direction (+1 or -1) for x and y based on ray direction
-      .step.x = (ray.x_dir >= 0) ? 1 : -1,
-      .step.y = (ray.y_dir >= 0) ? 1 : -1,
-      // Calculate delta distances - distance along ray from one x or y side to next
-      .delta.x = fabs(1.0 / ray.x_dir),
-      .delta.y = fabs(1.0 / ray.y_dir),
-      // Get player's current map grid cell position
-      .map_pos.x = floorf(ray.x0 / CELL_SIZE),
-      .map_pos.y = floorf(ray.y0 / CELL_SIZE),
-      // Calculate initial side distances - distance from start to first x or y grid line
-      .side_dist.x = (ray.x_dir < 0)
-                         ? ((ray.x0 / CELL_SIZE) - dda.map_pos.x) * dda.delta.x
-                         : (dda.map_pos.x + 1.0f - (ray.x0 / CELL_SIZE)) * dda.delta.x,
-      .side_dist.y = (ray.y_dir < 0)
-                         ? ((ray.y0 / CELL_SIZE) - dda.map_pos.y) * dda.delta.y
-                         : (dda.map_pos.y + 1.0f - (ray.y0 / CELL_SIZE)) * dda.delta.y,
-      .wall.x = ray.x0,
-      .wall.y = ray.y0,
-  };
-
-  print_text(angle_radians, ray, dda);
-
-  // Track if we've hit a wall and which side we hit
-  int hit = 0;
-
-  // DDA loop - step through grid cells until we hit a wall
-  while (!hit)
+  for (float current_angle = start_angle; current_angle <= end_angle; current_angle += 1.0f)
   {
-    // Step in x or y direction depending on which side distance is smaller
-    if (dda.side_dist.x < dda.side_dist.y)
-    {
-      // Calculate exact wall hit position for x-side
-      dda.wall.x = (ray.x_dir < 0) ? (dda.map_pos.x * CELL_SIZE) : ((dda.map_pos.x + 1) * CELL_SIZE);
-      dda.wall.y = ray.y0 + (dda.wall.x - ray.x0) * ray.y_dir / ray.x_dir;
-      dda.side_dist.x += dda.delta.x;
-      dda.map_pos.x += dda.step.x;
-    }
-    else
-    {
-      // Calculate exact wall hit position for y-side
-      dda.wall.y = (ray.y_dir < 0) ? (dda.map_pos.y * CELL_SIZE) : ((dda.map_pos.y + 1) * CELL_SIZE);
-      dda.wall.x = ray.x0 + (dda.wall.y - ray.y0) * ray.x_dir / ray.y_dir;
-      dda.side_dist.y += dda.delta.y;
-      dda.map_pos.y += dda.step.y;
-    }
+    float angle_radians = current_angle * (M_PI / 180.0);
 
-    // Check if we've hit a wall
-    if (map2D[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x] != z)
+    Ray_Pos ray = {
+        // Center ray start position on player
+        .x0 = player_pos.x + (PLAYER_SIZE / 2),
+        .y0 = player_pos.y + (PLAYER_SIZE / 2),
+        // Calculate ray direction vector from angle
+        .x_dir = cos(angle_radians),
+        .y_dir = sin(angle_radians),
+    };
+
+    DDA_Algo dda = {
+        // Determine step direction (+1 or -1) for x and y based on ray direction
+        .step.x = (ray.x_dir >= 0) ? 1 : -1,
+        .step.y = (ray.y_dir >= 0) ? 1 : -1,
+        // Calculate delta distances - distance along ray from one x or y side to next
+        .delta.x = fabs(1.0 / ray.x_dir),
+        .delta.y = fabs(1.0 / ray.y_dir),
+        // Get player's current map grid cell position
+        .map_pos.x = floorf(ray.x0 / CELL_SIZE),
+        .map_pos.y = floorf(ray.y0 / CELL_SIZE),
+        // Calculate initial side distances - distance from start to first x or y grid line
+        .side_dist.x = (ray.x_dir < 0)
+                           ? ((ray.x0 / CELL_SIZE) - dda.map_pos.x) * dda.delta.x
+                           : (dda.map_pos.x + 1.0f - (ray.x0 / CELL_SIZE)) * dda.delta.x,
+        .side_dist.y = (ray.y_dir < 0)
+                           ? ((ray.y0 / CELL_SIZE) - dda.map_pos.y) * dda.delta.y
+                           : (dda.map_pos.y + 1.0f - (ray.y0 / CELL_SIZE)) * dda.delta.y,
+        .wall.x = ray.x0,
+        .wall.y = ray.y0,
+    };
+
+    print_text(angle_radians, ray, dda);
+
+    // Track if we've hit a wall and which side we hit
+    int hit = 0;
+
+    // DDA loop - step through grid cells until we hit a wall
+    while (!hit)
     {
-      hit = 1;
+      // Step in x or y direction depending on which side distance is smaller
+      if (dda.side_dist.x < dda.side_dist.y)
+      {
+        // Calculate exact wall hit position for x-side
+        dda.wall.x = (ray.x_dir < 0) ? (dda.map_pos.x * CELL_SIZE) : ((dda.map_pos.x + 1) * CELL_SIZE);
+        dda.wall.y = ray.y0 + (dda.wall.x - ray.x0) * ray.y_dir / ray.x_dir;
+        dda.side_dist.x += dda.delta.x;
+        dda.map_pos.x += dda.step.x;
+      }
+      else
+      {
+        // Calculate exact wall hit position for y-side
+        dda.wall.y = (ray.y_dir < 0) ? (dda.map_pos.y * CELL_SIZE) : ((dda.map_pos.y + 1) * CELL_SIZE);
+        dda.wall.x = ray.x0 + (dda.wall.y - ray.y0) * ray.x_dir / ray.y_dir;
+        dda.side_dist.y += dda.delta.y;
+        dda.map_pos.y += dda.step.y;
+      }
+
+      // Check if we've hit a wall
+      if (map2D[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x] != z)
+      {
+        hit = 1;
+      }
     }
+    // Draw the ray from player to wall hit point
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+    SDL_RenderLine(renderer, ray.x0, ray.y0, dda.wall.x, dda.wall.y);
   }
-
-  // Draw the ray from player to wall hit point
-  SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-  SDL_RenderLine(renderer, ray.x0, ray.y0, dda.wall.x, dda.wall.y);
 }
 
 void draw_player(void)
