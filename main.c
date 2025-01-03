@@ -58,7 +58,6 @@ int sdl_init(void)
 
 SDL_Window *create_window(void)
 {
-  // Create window
   SDL_Window *window = SDL_CreateWindow("Hello World",
                                         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                         1024, 512,
@@ -73,7 +72,6 @@ SDL_Window *create_window(void)
 
 SDL_Renderer *create_renderer(SDL_Window *window)
 {
-  // Create renderer
   SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
   if (!renderer)
   {
@@ -109,7 +107,6 @@ void player_init(SDL_Renderer *renderer)
   SDL_SetTextureBlendMode(playerTexture, SDL_BLENDMODE_BLEND);
   SDL_SetTextureScaleMode(playerTexture, SDL_ScaleModeLinear);
 
-  // Initialize texture content
   SDL_SetRenderTarget(renderer, playerTexture);
   SDL_SetRenderDrawColor(renderer, 0, 128, 128, 255);
   SDL_RenderClear(renderer);
@@ -125,7 +122,7 @@ void draw_player(SDL_Renderer *renderer)
   // Calculate ray end point using angle
   float rayLength = 30.0f; // Length of direction indicator
   // Calculate ray end point using angle (rotated 90 degrees)
-  float angleRadians = (player.angle) * (PI / 180.0); // Subtract 90 degrees to align with up direction
+  float angleRadians = (player.angle) * (PI / 180.0);
   float rayEndX = rayStartX + rayLength * cos(angleRadians);
   float rayEndY = rayStartY + rayLength * sin(angleRadians);
 
@@ -141,69 +138,69 @@ void draw_player(SDL_Renderer *renderer)
                     &center,        // Center of rotation
                     SDL_FLIP_NONE); // No flipping
 
-  int r, mx, my, mp, dof;
-  float rx, ry, ra, xo, yo;
-  ra = player.angle * (PI / 180.0); // Convert to radians
+  // int r, mx, my, mp, dof;
+  // float rx, ry, ra, xo, yo;
+  // ra = player.angle * (PI / 180.0); // Convert to radians
 
-  // Check horizontal grid lines
-  dof = 0;
-  float aTan = -1 / tan(ra);
-  float hx = player.x, hy = player.y; // Horizontal intersection points
-  bool foundHorizWall = false;
+  // // Check horizontal grid lines
+  // dof = 0;
+  // float aTan = -1 / tan(ra);
+  // float hx = player.x, hy = player.y; // Horizontal intersection points
+  // bool foundHorizWall = false;
 
-  if (ra > PI)
-  { // Looking up
-    ry = (((int)player.y / RECT_H) * RECT_H) - 0.0001;
-    rx = (player.y - ry) * aTan + player.x;
-    yo = -RECT_H;
-    xo = -yo * aTan;
-  }
-  else if (ra < PI)
-  { // Looking down
-    ry = (((int)player.y / RECT_H) * RECT_H) + RECT_H;
-    rx = (player.y - ry) * aTan + player.x;
-    yo = RECT_H;
-    xo = -yo * aTan;
-  }
-  else
-  { // Looking straight left or right
-    rx = player.x;
-    ry = player.y;
-    dof = 8;
-  }
+  // if (ra > PI)
+  // { // Looking up
+  //   ry = (((int)player.y / RECT_H) * RECT_H) - 0.0001;
+  //   rx = (player.y - ry) * aTan + player.x;
+  //   yo = -RECT_H;
+  //   xo = -yo * aTan;
+  // }
+  // else if (ra < PI)
+  // { // Looking down
+  //   ry = (((int)player.y / RECT_H) * RECT_H) + RECT_H;
+  //   rx = (player.y - ry) * aTan + player.x;
+  //   yo = RECT_H;
+  //   xo = -yo * aTan;
+  // }
+  // else
+  // { // Looking straight left or right
+  //   rx = player.x;
+  //   ry = player.y;
+  //   dof = 8;
+  // }
 
-  while (dof < 8)
-  {
-    mx = (int)(rx) / RECT_W;
-    my = (int)(ry) / RECT_H;
-    mp = my * COLUMNS + mx;
+  // while (dof < 8)
+  // {
+  //   mx = (int)(rx) / RECT_W;
+  //   my = (int)(ry) / RECT_H;
+  //   mp = my * COLUMNS + mx;
 
-    // Check if we're in bounds and hit a wall
-    if (mp >= 0 && mp < ROWS * COLUMNS && map2D[mp] == 1)
-    {
-      hx = rx;
-      hy = ry;
-      foundHorizWall = true;
-      dof = 8; // End the loop
-    }
-    else
-    {
-      rx += xo; // Move to next horizontal line
-      ry += yo;
-      dof++;
-    }
-  }
+  //   // Check if we're in bounds and hit a wall
+  //   if (mp >= 0 && mp < ROWS * COLUMNS && map2D[mp] == 1)
+  //   {
+  //     hx = rx;
+  //     hy = ry;
+  //     foundHorizWall = true;
+  //     dof = 8; // End the loop
+  //   }
+  //   else
+  //   {
+  //     rx += xo; // Move to next horizontal line
+  //     ry += yo;
+  //     dof++;
+  //   }
+  // }
 
-  // Draw the ray if we found a wall
-  if (foundHorizWall)
-  {
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red for horizontal intersections
-    SDL_RenderDrawLineF(renderer,
-                        player.x + PLAYER_W / 2,
-                        player.y + PLAYER_H / 2,
-                        hx,
-                        hy);
-  }
+  // // Draw the ray if we found a wall
+  // if (foundHorizWall)
+  // {
+  //   SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red for horizontal intersections
+  //   SDL_RenderDrawLineF(renderer,
+  //                       player.x + PLAYER_W / 2,
+  //                       player.y + PLAYER_H / 2,
+  //                       hx,
+  //                       hy);
+  // }
 }
 
 static void draw_map(SDL_Renderer *renderer)
@@ -240,18 +237,15 @@ static void draw_map(SDL_Renderer *renderer)
     initialized = true;
   }
 
-  // Draw white rectangles
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
   SDL_RenderFillRectsF(renderer, white_rects, white_count);
 
-  // Draw black rectangles
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   SDL_RenderFillRectsF(renderer, black_rects, black_count);
 }
 
 int display(SDL_Window *window, SDL_Renderer *renderer)
 {
-  // Main loop
   SDL_Event e;
   int quit = 0;
   while (!quit)
