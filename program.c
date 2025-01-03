@@ -31,10 +31,10 @@ const bool *keyboard_state;
 // clang-format off
 const static Letter map2D[GRID_SIZE] = {
   A, A, A, A, A, A, A, A,
-  A, z, A, z, z, z, z, A,
-  A, z, A, z, z, z, z, A,
-  A, z, A, z, A, A, z, A,
-  A, z, A, z, A, A, z, A,
+  A, z, B, z, z, z, z, A,
+  A, z, B, z, z, z, z, A,
+  A, z, B, z, B, B, z, A,
+  A, z, B, z, B, B, z, A,
   A, z, z, z, z, z, z, A,
   A, z, z, z, z, z, z, A,
   A, A, A, A, A, A, A, A,
@@ -164,7 +164,7 @@ static void draw_dda_ray(void)
   float start_angle = player_pos.angle - 30; // 30° left of center
   float end_angle = player_pos.angle + 30;   // 30° right of center
 
-  for (float current_angle = start_angle; current_angle <= end_angle; current_angle += 1.0f)
+  for (float current_angle = start_angle; current_angle <= end_angle; current_angle += 0.25f)
   {
     float angle_radians = current_angle * (M_PI / 180.0);
 
@@ -224,15 +224,64 @@ static void draw_dda_ray(void)
         dda.map_pos.y += dda.step.y;
       }
 
+      ray.x1 = dda.wall.x;
+      ray.y1 = dda.wall.y;
+
       // Check if we've hit a wall
       if (map2D[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x] != z)
       {
         hit = 1;
+        switch (map2D[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x])
+        {
+        case A:
+          SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // RED
+          break;
+        case B:
+          SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255); // GREEN
+          break;
+        default:
+          SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // GREEN
+        }
       }
     }
     // Draw the ray from player to wall hit point
-    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-    SDL_RenderLine(renderer, ray.x0, ray.y0, dda.wall.x, dda.wall.y);
+    SDL_RenderLine(renderer, ray.x0, ray.y0, ray.x1, ray.y1);
+
+    float hypotenuse = sqrt(pow(ray.x1 - ray.x0, 2) + pow(ray.y1 - ray.y0, 2));
+    // Calculate the x position for this ray's vertical line
+    // Map the angle from [-30, 30] to screen position [WINDOW_W/2, WINDOW_W]
+    float ray_screen_pos = ((current_angle - start_angle) / 60.0f) * (WINDOW_W / 2) + WINDOW_W / 2;
+
+    // Calculate perpendicular distance to avoid fisheye effect
+    float perp_distance = hypotenuse * cos((current_angle - player_pos.angle) * (M_PI / 180.0));
+
+    // Calculate line height using perpendicular distance
+    float line_h = (CELL_SIZE * WINDOW_H) / perp_distance;
+    if (line_h > WINDOW_H)
+      line_h = WINDOW_H;
+
+    // Calculate where to start drawing the vertical line so it's centered
+    float line_offset = (WINDOW_H - line_h) / 2;
+
+    // // Draw the vertical wall line
+    // SDL_RenderLine(renderer,
+    //                ray_screen_pos,      // x1
+    //                line_offset,         // y1 (top of line)
+    //                ray_screen_pos,      // x2 (same x position)
+    //                line_offset + line_h // y2 (bottom of line)
+    // );
+
+    // Calculate the width of each vertical strip
+    float strip_width = (WINDOW_W / 2) / ((end_angle - start_angle) / 0.25f);
+
+    SDL_FRect wall_rect = {
+        .x = (int)ray_screen_pos,
+        .y = (int)line_offset,
+        .w = (int)ceil(strip_width),
+        .h = (int)line_h,
+    };
+
+    SDL_RenderRect(renderer, &wall_rect);
   }
 }
 
