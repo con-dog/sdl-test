@@ -29,7 +29,7 @@ Player_Pos player_pos = {
 const bool *keyboard_state;
 
 // clang-format off
-const static Letter map2D[GRID_SIZE] = {
+const static Letter map_2D_wall[GRID_SIZE] = {
   A, A, A, A, A, A, A, A,
   A, z, B, z, z, z, z, A,
   A, z, B, z, z, z, z, A,
@@ -232,10 +232,10 @@ static void draw_dda_ray(void)
       ray.y1 = dda.wall.y;
 
       // Check if we've hit a wall
-      if (map2D[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x] != z)
+      if (map_2D_wall[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x] != z)
       {
         hit = 1;
-        switch (map2D[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x])
+        switch (map_2D_wall[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x])
         {
         case A:
           r = 255;
@@ -327,7 +327,7 @@ static void draw_map(void)
         rect.w = CELL_SIZE * (1.0f - offset);
         rect.x = (j * CELL_SIZE) + (CELL_SIZE * offset / 2);
         rect.y = (i * CELL_SIZE) + (CELL_SIZE * offset / 2);
-        if (map2D[i * GRID_COLS + j])
+        if (map_2D_wall[i * GRID_COLS + j])
         {
           black_rects[black_count++] = rect;
         }
