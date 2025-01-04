@@ -31,10 +31,10 @@ const bool *keyboard_state;
 // clang-format off
 const static Letter map2D[GRID_SIZE] = {
   A, A, A, A, A, A, A, A,
-  A, z, B, z, z, z, z, A,
-  A, z, B, z, z, z, z, A,
-  A, z, B, z, B, B, z, A,
-  A, z, B, z, B, B, z, A,
+  A, z, A, z, z, z, z, A,
+  A, z, A, z, z, z, z, A,
+  A, z, A, z, A, A, z, A,
+  A, z, A, z, A, A, z, A,
   A, z, z, z, z, z, z, A,
   A, z, z, z, z, z, z, A,
   A, A, A, A, A, A, A, A,
@@ -164,6 +164,8 @@ static void draw_dda_ray(void)
   float start_angle = player_pos.angle - 30; // 30° left of center
   float end_angle = player_pos.angle + 30;   // 30° right of center
 
+  Uint8 r, g, b;
+
   for (float current_angle = start_angle; current_angle <= end_angle; current_angle += 0.25f)
   {
     float angle_radians = current_angle * (M_PI / 180.0);
@@ -202,7 +204,7 @@ static void draw_dda_ray(void)
 
     // Track if we've hit a wall and which side we hit
     int hit = 0;
-
+    int side;
     // DDA loop - step through grid cells until we hit a wall
     while (!hit)
     {
@@ -214,6 +216,7 @@ static void draw_dda_ray(void)
         dda.wall.y = ray.y0 + (dda.wall.x - ray.x0) * ray.y_dir / ray.x_dir;
         dda.side_dist.x += dda.delta.x;
         dda.map_pos.x += dda.step.x;
+        side = 0;
       }
       else
       {
@@ -222,6 +225,7 @@ static void draw_dda_ray(void)
         dda.wall.x = ray.x0 + (dda.wall.y - ray.y0) * ray.x_dir / ray.y_dir;
         dda.side_dist.y += dda.delta.y;
         dda.map_pos.y += dda.step.y;
+        side = 1;
       }
 
       ray.x1 = dda.wall.x;
@@ -234,16 +238,28 @@ static void draw_dda_ray(void)
         switch (map2D[GRID_ROWS * (int)dda.map_pos.y + (int)dda.map_pos.x])
         {
         case A:
-          SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // RED
+          r = 255;
+          g = 0;
+          b = 0;
           break;
         case B:
-          SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255); // GREEN
           break;
         default:
-          SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // GREEN
+          r = 0;
+          g = 0;
+          b = 0;
         }
       }
     }
+
+    if (side == 0)
+    {
+      r = (Uint8)(r * 0.7);
+      g = (Uint8)(g * 0.7);
+      b = (Uint8)(b * 0.7);
+    }
+
+    SDL_SetRenderDrawColor(renderer, r, g, b, 255);
     // Draw the ray from player to wall hit point
     SDL_RenderLine(renderer, ray.x0, ray.y0, ray.x1, ray.y1);
 
@@ -273,7 +289,7 @@ static void draw_dda_ray(void)
         .h = (int)line_h,
     };
 
-    SDL_RenderRect(renderer, &wall_rect);
+    SDL_RenderFillRect(renderer, &wall_rect);
   }
 }
 
