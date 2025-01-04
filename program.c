@@ -31,10 +31,10 @@ const bool *keyboard_state;
 // clang-format off
 const static Letter map2D[GRID_SIZE] = {
   A, A, A, A, A, A, A, A,
-  A, z, A, z, z, z, z, A,
-  A, z, A, z, z, z, z, A,
-  A, z, A, z, A, A, z, A,
-  A, z, A, z, A, A, z, A,
+  A, z, B, z, z, z, z, A,
+  A, z, B, z, z, z, z, A,
+  A, z, B, z, C, C, z, A,
+  A, z, B, z, C, C, z, A,
   A, z, z, z, z, z, z, A,
   A, z, z, z, z, z, z, A,
   A, A, A, A, A, A, A, A,
@@ -243,6 +243,14 @@ static void draw_dda_ray(void)
           b = 0;
           break;
         case B:
+          r = 0;
+          g = 255;
+          b = 0;
+          break;
+        case C:
+          r = 0;
+          g = 0;
+          b = 255;
           break;
         default:
           r = 0;
