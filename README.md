@@ -1,5 +1,7 @@
 # SDL3 2.5D Raycasting Engine
 
+![Preview](https://github.com/con-dog/sdl-test/blob/c120fae318e51c8dfc0490466e9f4ded2c83a369/Screenshot%202025-01-04%20at%202.41.59%E2%80%AFPM.png)
+
 A simple 2.5D raycaster built with C and SDL3 - similar to Wolfenstein engine.
 
 Can walk around a maze with wall collisions. Requires SDL3 and SDL3_ttf to build and run:
