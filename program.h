@@ -16,6 +16,7 @@
 #define ROTATION_STEP 5.0f
 #define PLAYER_SPEED 15.0f
 #define PLAYER_ROTATION_SPEED 30.0f
+#define INTERACTION_DISTANCE 5.0f
 // Math Utils
 #define CLOCKWISE 1.0f
 #define ANTI_CLOCKWISE -1.0f

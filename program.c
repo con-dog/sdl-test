@@ -358,8 +358,29 @@ void rotate_player(float rotation_type, float delta_time)
 
 void move_player(float direction, float delta_time)
 {
-  player_pos.x = player_pos.x + (direction * player_pos.dx * PLAYER_SPEED * delta_time);
-  player_pos.y = player_pos.y + (direction * player_pos.dy * PLAYER_SPEED * delta_time);
+  // Calculate potential new position
+  float new_x = player_pos.x + (direction * player_pos.dx * PLAYER_SPEED * delta_time);
+  float new_y = player_pos.y + (direction * player_pos.dy * PLAYER_SPEED * delta_time);
+
+  // Calculate the map grid coordinates for checking collisions
+  int map_x = (int)(new_x / CELL_SIZE);
+  int map_y = (int)(new_y / CELL_SIZE);
+
+  // Add offset for the player's size when checking corners
+  float offset = PLAYER_SIZE * 0.5f; // Half the player's size
+
+  // Check all four corners of the player's hitbox
+  int top_left = map_2D_wall[((int)((new_y - offset) / CELL_SIZE) * GRID_COLS) + (int)((new_x - offset) / CELL_SIZE)];
+  int top_right = map_2D_wall[((int)((new_y - offset) / CELL_SIZE) * GRID_COLS) + (int)((new_x + offset) / CELL_SIZE)];
+  int bottom_left = map_2D_wall[((int)((new_y + offset) / CELL_SIZE) * GRID_COLS) + (int)((new_x - offset) / CELL_SIZE)];
+  int bottom_right = map_2D_wall[((int)((new_y + offset) / CELL_SIZE) * GRID_COLS) + (int)((new_x + offset) / CELL_SIZE)];
+
+  // Only move if none of the corners would hit a wall
+  if (top_left == z && top_right == z && bottom_left == z && bottom_right == z)
+  {
+    player_pos.x = new_x;
+    player_pos.y = new_y;
+  }
 }
 
 void apply_player_movement()
